@@ -130,7 +130,6 @@ static char *ngx_http_dav_ext_lock(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static ngx_int_t ngx_http_dav_ext_init(ngx_conf_t *cf);
 
-
 static ngx_conf_bitmask_t  ngx_http_dav_ext_methods_mask[] = {
     { ngx_string("off"),      NGX_HTTP_DAV_EXT_OFF },
     { ngx_string("propfind"), NGX_HTTP_PROPFIND    },
@@ -737,6 +736,10 @@ ngx_http_dav_ext_propfind(ngx_http_request_t *r, ngx_uint_t props)
     ngx_array_t                entries;
     ngx_file_info_t            fi;
     ngx_http_dav_ext_entry_t  *entry;
+    ngx_http_core_loc_conf_t  *clcf;
+    
+
+    clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
     if (ngx_array_init(&entries, r->pool, 40, sizeof(ngx_http_dav_ext_entry_t))
         != NGX_OK)
@@ -843,7 +846,7 @@ ngx_http_dav_ext_propfind(ngx_http_request_t *r, ngx_uint_t props)
 
     filename = path.data;
     filename[path.len] = '/';
-
+    
     for ( ;; ) {
         ngx_set_errno(0);
 
@@ -900,6 +903,26 @@ ngx_http_dav_ext_propfind(ngx_http_request_t *r, ngx_uint_t props)
                               ngx_de_info_n " \"%s\" failed", filename);
                 rc = NGX_HTTP_INTERNAL_SERVER_ERROR;
                 break;
+            }
+
+            ngx_file_info_t fi;
+            if (ngx_link_info(filename, &fi) == NGX_OK) {
+                ngx_int_t is_link = ngx_is_link(&fi);
+                if (is_link && clcf->disable_symlinks == NGX_DISABLE_SYMLINKS_ON) {
+                    entries.nelts--;
+                    continue;
+                } else if (is_link) {
+                    if (clcf->disable_symlinks != NGX_DISABLE_SYMLINKS_ON) {
+                        if (clcf->disable_symlinks == NGX_DISABLE_SYMLINKS_NOTOWNER) {
+                            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                                "symlinks disabled notowner is not implemented, indexing %s", filename);
+                        } else {
+                            ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0,
+                                "symbolic links are not disabled, indexing %s", filename);
+                        }
+                       
+                    }
+                } 
             }
         }
 
