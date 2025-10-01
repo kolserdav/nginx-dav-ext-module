@@ -738,7 +738,6 @@ ngx_http_dav_ext_propfind(ngx_http_request_t *r, ngx_uint_t props)
     ngx_http_dav_ext_entry_t  *entry;
     ngx_http_core_loc_conf_t  *clcf;
     
-
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
     if (ngx_array_init(&entries, r->pool, 40, sizeof(ngx_http_dav_ext_entry_t))
@@ -846,7 +845,7 @@ ngx_http_dav_ext_propfind(ngx_http_request_t *r, ngx_uint_t props)
 
     filename = path.data;
     filename[path.len] = '/';
-    
+
     for ( ;; ) {
         ngx_set_errno(0);
 
