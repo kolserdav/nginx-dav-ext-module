@@ -897,31 +897,44 @@ ngx_http_dav_ext_propfind(ngx_http_request_t *r, ngx_uint_t props)
 
             ngx_cpystrn(last, name.data, name.len + 1);
 
+
+            ngx_file_info_t fi;
+            if (ngx_link_info(filename, &fi) == NGX_OK) {
+                if (ngx_is_link(&fi)) {
+                    if (clcf->disable_symlinks == NGX_DISABLE_SYMLINKS_ON) {
+                        entries.nelts--;
+                        continue;
+                    } else {
+                        
+                        ngx_file_info_t target_fi;
+                        if (ngx_file_info(filename, &target_fi) != NGX_OK) {
+                            ngx_log_error(NGX_LOG_NOTICE, r->connection->log, ngx_errno,
+                                "broken symbolic link %s, skipping", filename);
+                            entries.nelts--;
+                            continue;
+                        }
+
+                        if (clcf->disable_symlinks != NGX_DISABLE_SYMLINKS_ON) {
+                            if (clcf->disable_symlinks == NGX_DISABLE_SYMLINKS_NOTOWNER) {
+                                ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                                    "symlinks disabled notowner is not implemented, indexing %s", filename);
+                            } else {
+                                ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0,
+                                    "symbolic links are not disabled, indexing %s", filename);
+                            }
+                        
+                        }
+                    } 
+                }
+                
+            }
+
+
             if (ngx_de_info(filename, &dir) == NGX_FILE_ERROR) {
                 ngx_log_error(NGX_LOG_CRIT, r->connection->log, ngx_errno,
                               ngx_de_info_n " \"%s\" failed", filename);
                 rc = NGX_HTTP_INTERNAL_SERVER_ERROR;
                 break;
-            }
-
-            ngx_file_info_t fi;
-            if (ngx_link_info(filename, &fi) == NGX_OK) {
-                ngx_int_t is_link = ngx_is_link(&fi);
-                if (is_link && clcf->disable_symlinks == NGX_DISABLE_SYMLINKS_ON) {
-                    entries.nelts--;
-                    continue;
-                } else if (is_link) {
-                    if (clcf->disable_symlinks != NGX_DISABLE_SYMLINKS_ON) {
-                        if (clcf->disable_symlinks == NGX_DISABLE_SYMLINKS_NOTOWNER) {
-                            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                                "symlinks disabled notowner is not implemented, indexing %s", filename);
-                        } else {
-                            ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0,
-                                "symbolic links are not disabled, indexing %s", filename);
-                        }
-                       
-                    }
-                } 
             }
         }
 
